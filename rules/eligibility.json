@@ -1,0 +1,4 @@
+{
+  "rule": {"==": [{"var": "role"}, "staff"]},
+  "note": "Invented toy policy lever for demo purposes only — no legislative or programmatic basis. Eligibility is arbitrarily restricted to academic staff (lecturers), on the narrative rationale that a facilitating-conditions support program for integrating AI into teaching most plausibly targets the people doing the teaching. Originally planned to gate on 'faculty' (department), but the real Mendeley dataset (pyyjfthc84) has no faculty/department field — only role (staff/student), education level, age group, and gender. Gates on role instead; see docs/dataset-schema-notes.md for the discovery."
+}
