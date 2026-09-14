@@ -10,7 +10,7 @@ _SHORT_NAMES = {"pe_score": "pe", "ee_score": "ee", "si_score": "si", "fc_score"
 def fit_dcm(df: pd.DataFrame):
     X = sm.add_constant(df[FEATURES])
     y = df["adopter"]
-    return sm.Logit(y, X).fit(disp=0)
+    return sm.Logit(y, X).fit(disp=0, method="bfgs", maxiter=200)
 
 
 def dcm_register_rows(result) -> list[RegisterRow]:
