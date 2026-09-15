@@ -66,3 +66,42 @@ def test_fc_score_is_reverse_coded(tmp_path):
 
     out = preprocess.load_and_clean(str(csv_path))
     assert out.loc[0, "fc_score"] > out.loc[1, "fc_score"]
+
+
+def test_load_and_clean_handles_dropped_rows_without_index_misalignment(tmp_path):
+    """A row with a blank cell in an item column gets dropped by dropna(). Before
+    `raw.dropna(...).reset_index(drop=True)`, the resulting gap in raw's index
+    (e.g. [0, 2] after dropping row 1) could silently mis-align out[...] column
+    assignments against raw[...] (pandas assigns by label, not position),
+    corrupting the SURVIVING rows with NaN even though only the dropped row was
+    actually incomplete. This test catches that regression via a tmp_path fixture
+    rather than touching the shared sample_raw.csv fixture (whose row count other
+    tests assert against).
+    """
+    from src import schema
+
+    role_col = schema.RAW_DEMOGRAPHIC_COLUMNS["role"]
+    all_cols = [c for cols in schema.RAW_TO_ITEM_COLUMNS.values() for c in cols]
+    blank_col = all_cols[0]
+
+    def make_row(role, blank=False):
+        row = {role_col: role}
+        for col in all_cols:
+            row[col] = "" if (blank and col == blank_col) else "3 (Trung lập)"
+        return row
+
+    rows = [
+        make_row("Giảng viên"),              # row 0: valid, survives
+        make_row("Sinh viên", blank=True),   # row 1: dropped (blank item cell)
+        make_row("Sinh viên"),                # row 2: valid, survives
+    ]
+    df = pd.DataFrame.from_records(rows)
+    csv_path = tmp_path / "dropna_fixture.csv"
+    df.to_csv(csv_path, index=False)
+
+    out = preprocess.load_and_clean(str(csv_path))
+
+    assert len(out) == 2
+    assert out["role"].notna().all()
+    for col in ["pe_score", "ee_score", "si_score", "fc_score", "behavioral_intention"]:
+        assert out[col].notna().all()

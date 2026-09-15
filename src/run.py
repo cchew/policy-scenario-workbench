@@ -31,6 +31,7 @@ def run_pipeline(raw_csv_path: str, dag_path: str, output_dir: str, seed: int = 
         fc_uplift=abm_params["fc_uplift"],
         peer_influence_weight=abm_params["peer_influence_weight"],
         timesteps=abm_params["timesteps"],
+        n_agents=abm_params["n_agents"],
     ):
         register.add(row)
     register.write_csv(str(Path(output_dir) / "register.csv"))

@@ -1,10 +1,16 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from src import schema
 
 RAW_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "raw" / "ai_adoption_vietnam.csv"
+
+_real_csv_missing = pytest.mark.skipif(
+    not RAW_CSV_PATH.exists(),
+    reason="real dataset not present locally — see data/raw/README.md",
+)
 
 
 def test_construct_item_columns_cover_all_five_constructs():
@@ -13,6 +19,7 @@ def test_construct_item_columns_cover_all_five_constructs():
         assert len(cols) >= 1, f"{construct} has no raw item columns filled in"
 
 
+@_real_csv_missing
 def test_construct_item_columns_exist_in_real_csv():
     df = pd.read_csv(RAW_CSV_PATH)
     for construct, cols in schema.RAW_TO_ITEM_COLUMNS.items():
@@ -28,6 +35,7 @@ def test_demographic_columns_present():
         assert raw_name, f"{key} has no raw column name filled in"
 
 
+@_real_csv_missing
 def test_demographic_columns_exist_in_real_csv():
     df = pd.read_csv(RAW_CSV_PATH)
     for raw_name in schema.RAW_DEMOGRAPHIC_COLUMNS.values():

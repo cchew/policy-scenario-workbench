@@ -55,10 +55,11 @@ def test_same_seed_produces_identical_network():
 
 
 def test_abm_register_rows_all_tagged_expert_assumption():
-    rows = abm_register_rows(k=6, rewiring_p=0.1, fc_uplift=1.0, peer_influence_weight=0.5, timesteps=20)
+    rows = abm_register_rows(k=6, rewiring_p=0.1, fc_uplift=1.0, peer_influence_weight=0.5,
+                              timesteps=20, n_agents=300)
     assert all(r.evidence_strength == "expert-assumption" for r in rows)
     param_ids = {r.parameter for r in rows}
     assert param_ids == {
         "abm.network.k", "abm.network.rewiring_p", "lever.fc_uplift",
-        "abm.peer_influence.weight", "abm.timesteps.T",
+        "abm.peer_influence.weight", "abm.timesteps.T", "abm.n_agents",
     }

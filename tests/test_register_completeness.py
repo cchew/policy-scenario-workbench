@@ -1,15 +1,30 @@
 # tests/test_register_completeness.py
 import numpy as np
 import pandas as pd
-from src.dcm import fit_dcm, dcm_register_rows
+from src.dcm import fit_dcm, dcm_register_rows, FEATURES, _SHORT_NAMES
 from src.abm import abm_register_rows, BASELINE_PARAMS
 from src.register import Register
 
-REQUIRED_PARAM_IDS = {
-    "dcm.intercept", "dcm.coef.pe", "dcm.coef.ee", "dcm.coef.si", "dcm.coef.fc",
-    "lever.fc_uplift", "abm.network.k", "abm.network.rewiring_p",
-    "abm.peer_influence.weight", "abm.timesteps.T",
+# Explicit mapping from BASELINE_PARAMS key -> register row ID. Kept explicit (not
+# auto-derived from the key string) since the ID format doesn't mechanically follow
+# from the param name (e.g. "fc_uplift" -> "lever.fc_uplift", not "abm.fc_uplift").
+# Deriving REQUIRED_PARAM_IDS from this + BASELINE_PARAMS.keys() below means this test
+# fails loudly (KeyError or a missing-parameter assertion) if a future BASELINE_PARAMS
+# key is added without both a mapping entry here and a corresponding register row.
+_ABM_PARAM_TO_REGISTER_ID = {
+    "k": "abm.network.k",
+    "rewiring_p": "abm.network.rewiring_p",
+    "fc_uplift": "lever.fc_uplift",
+    "peer_influence_weight": "abm.peer_influence.weight",
+    "timesteps": "abm.timesteps.T",
+    "n_agents": "abm.n_agents",
 }
+
+REQUIRED_PARAM_IDS = (
+    {"dcm.intercept"}
+    | {f"dcm.coef.{_SHORT_NAMES[f]}" for f in FEATURES}
+    | {_ABM_PARAM_TO_REGISTER_ID[k] for k in BASELINE_PARAMS.keys()}
+)
 
 
 def test_register_covers_every_dag_edge_reference():
@@ -29,6 +44,7 @@ def test_register_covers_every_dag_edge_reference():
         fc_uplift=BASELINE_PARAMS["fc_uplift"],
         peer_influence_weight=BASELINE_PARAMS["peer_influence_weight"],
         timesteps=BASELINE_PARAMS["timesteps"],
+        n_agents=BASELINE_PARAMS["n_agents"],
     ):
         reg.add(row)
 

@@ -8,10 +8,11 @@ from src.schema import LIKERT_MAX
 
 
 class AdoptionAgent(mesa.Agent):
-    def __init__(self, model, eligible: bool, baseline_prob: float):
+    def __init__(self, model, eligible: bool, baseline_prob: float, step_hazard: float):
         super().__init__(model)
         self.eligible = eligible
         self.baseline_prob = baseline_prob
+        self.step_hazard = step_hazard
         self.adopted = False
         self.adopted_step = None
 
@@ -36,7 +37,12 @@ class DiffusionModel(mesa.Model):
             features["fc_score"] = fc
             X = pd.DataFrame([features])[FEATURES]
             baseline_prob = float(predict_probability(dcm_result, X).iloc[0])
-            agent = AdoptionAgent(self, eligible=eligible, baseline_prob=baseline_prob)
+            # Convert the DCM's cumulative/terminal adoption probability into a genuine
+            # per-step hazard, once, at construction time. `_SENSITIVITY_RANGES["timesteps"]`
+            # never includes 0, so no zero-division guard is needed here.
+            step_hazard = 1 - (1 - baseline_prob) ** (1 / self.timesteps)
+            agent = AdoptionAgent(self, eligible=eligible, baseline_prob=baseline_prob,
+                                   step_hazard=step_hazard)
             self.node_to_agent[node_id] = agent
 
     def neighbour_adopted_fraction(self, node_id: int) -> float:
@@ -51,7 +57,7 @@ class DiffusionModel(mesa.Model):
             if agent.adopted:
                 continue
             fraction = self.neighbour_adopted_fraction(node_id)
-            prob = adoption_probability(agent.baseline_prob, self.peer_influence_weight, fraction)
+            prob = adoption_probability(agent.step_hazard, self.peer_influence_weight, fraction)
             if self.random.random() < prob:
                 agent.adopted = True
                 agent.adopted_step = current_step
@@ -67,7 +73,8 @@ class DiffusionModel(mesa.Model):
 
 
 def abm_register_rows(k: int, rewiring_p: float, fc_uplift: float,
-                       peer_influence_weight: float, timesteps: int) -> list[RegisterRow]:
+                       peer_influence_weight: float, timesteps: int,
+                       n_agents: int) -> list[RegisterRow]:
     return [
         RegisterRow("abm.network.k", k, "expert assumption", "expert-assumption",
                     "Watts-Strogatz nearest-neighbour degree; no data justifies a specific value"),
@@ -79,6 +86,8 @@ def abm_register_rows(k: int, rewiring_p: float, fc_uplift: float,
                     "Multiplier weight on neighbour-adopted fraction"),
         RegisterRow("abm.timesteps.T", timesteps, "expert assumption", "expert-assumption",
                     "Fixed diffusion horizon"),
+        RegisterRow("abm.n_agents", n_agents, "expert assumption", "expert-assumption",
+                    "Population size for the ABM simulation; expert assumption, not derived from data."),
     ]
 
 

@@ -19,7 +19,7 @@ def load_and_clean(raw_csv_path: str) -> pd.DataFrame:
     raw = pd.read_csv(raw_csv_path)
     raw = raw.dropna(subset=[
         c for cols in schema.RAW_TO_ITEM_COLUMNS.values() for c in cols
-    ])
+    ]).reset_index(drop=True)
 
     out = pd.DataFrame()
     out["respondent_id"] = raw.index

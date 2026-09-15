@@ -11,9 +11,15 @@ import pandas as pd
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
+        sha = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent, text=True
         ).strip()
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain"], cwd=Path(__file__).parent, text=True
+        )
+        if status.strip():
+            sha += "-dirty"
+        return sha
     except Exception:
         return "unknown"
 

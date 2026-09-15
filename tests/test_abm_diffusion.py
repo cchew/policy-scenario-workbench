@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 from src.abm import DiffusionModel, final_adoption_rate, uncertainty_distribution, one_at_a_time_sensitivity
 from src.dcm import fit_dcm
 
@@ -94,3 +95,24 @@ def test_one_at_a_time_sensitivity_covers_all_five_params():
     assert set(tornado.keys()) == {"k", "rewiring_p", "fc_uplift", "peer_influence_weight", "timesteps"}
     for lo, hi in tornado.values():
         assert lo <= hi
+
+
+def test_step_hazard_recovers_baseline_prob_as_terminal_probability():
+    """Regression test for the diffusion-saturation bug: baseline_prob must be
+    converted to a per-step hazard ONCE at construction, not re-applied raw every
+    timestep (which would make P(adopt by T)=1-(1-p)^T saturate near 1 for any
+    baseline_prob above ~0.15 at T=20, swamping the fc_uplift lever and the peer
+    network). This asserts the closed-form property that must hold immediately
+    after construction, for every agent, independent of any stochastic draw:
+    1 - (1 - step_hazard)**timesteps == baseline_prob.
+    """
+    df = _respondents_df()
+    result = fit_dcm(df)
+    timesteps = 20
+    model = DiffusionModel(df, result, n_agents=25, k=4, rewiring_p=0.1,
+                            fc_uplift=1.0, peer_influence_weight=0.0,
+                            timesteps=timesteps, seed=11)
+    for agent in model.node_to_agent.values():
+        assert agent.step_hazard != agent.baseline_prob or agent.baseline_prob == 0.0
+        recovered_terminal_prob = 1 - (1 - agent.step_hazard) ** timesteps
+        assert recovered_terminal_prob == pytest.approx(agent.baseline_prob, abs=1e-9)
