@@ -28,15 +28,25 @@ class DiffusionModel(mesa.Model):
         self.node_to_agent: dict[int, AdoptionAgent] = {}
 
         sample = respondents_df.sample(n=n_agents, replace=True, random_state=seed).reset_index(drop=True)
+        # Exposed so callers (e.g. run.py's cohort_breakdown join) can read back the
+        # exact bootstrap draw this model predicted against, instead of re-deriving a
+        # second draw that has to be kept in lockstep by using an identical seed.
+        self.sample = sample
+
+        eligible_mask = sample["eligible"].astype(bool)
+        fc_scores = sample["fc_score"].mask(
+            eligible_mask, (sample["fc_score"] + fc_uplift).clip(upper=LIKERT_MAX)
+        )
+        # One batch prediction for all n_agents instead of one statsmodels call per
+        # agent — this loop runs ~55-60 times per pipeline call (uncertainty sweep +
+        # sensitivity sweep), so per-agent calls meant tens of thousands of individual
+        # predict() calls.
+        X = sample[FEATURES].assign(fc_score=fc_scores)
+        baseline_probs = predict_probability(dcm_result, X)
+
         for node_id, row in sample.iterrows():
-            fc = row["fc_score"]
             eligible = bool(row["eligible"])
-            if eligible:
-                fc = min(fc + fc_uplift, LIKERT_MAX)
-            features = {f: row[f] for f in FEATURES}
-            features["fc_score"] = fc
-            X = pd.DataFrame([features])[FEATURES]
-            baseline_prob = float(predict_probability(dcm_result, X).iloc[0])
+            baseline_prob = float(baseline_probs.loc[node_id])
             # Convert the DCM's cumulative/terminal adoption probability into a genuine
             # per-step hazard, once, at construction time. `_SENSITIVITY_RANGES["timesteps"]`
             # never includes 0, so no zero-division guard is needed here.
@@ -106,6 +116,10 @@ def final_adoption_rate(respondents_df, dcm_result, seed: int, **overrides) -> f
 
 
 def uncertainty_distribution(respondents_df, dcm_result, n_seeds: int = 30) -> list[float]:
+    """Sweeps its own internal seed range (0..n_seeds-1) — deliberately independent
+    of any caller-supplied pipeline seed, so this distribution is comparable across
+    scenario runs made with different seeds. The scenario manifest's recorded `seed`
+    therefore governs the point-estimate diffusion run only, not this sweep."""
     return [final_adoption_rate(respondents_df, dcm_result, seed=s) for s in range(n_seeds)]
 
 
@@ -115,10 +129,15 @@ _SENSITIVITY_RANGES = {
     "fc_uplift": [0.0, 0.5, 1.0, 1.5, 2.0],
     "peer_influence_weight": [0.0, 0.25, 0.5, 0.75, 1.0],
     "timesteps": [10, 15, 20, 25, 30],
+    "n_agents": [100, 200, 300, 400, 500],
 }
 
 
 def one_at_a_time_sensitivity(respondents_df, dcm_result) -> dict:
+    """Sweeps each parameter at a fixed seed=42, independent of any caller-supplied
+    pipeline seed — same rationale as `uncertainty_distribution`: comparability
+    across scenario runs, at the cost of this sweep not reflecting the manifest's
+    recorded seed."""
     tornado = {}
     for param, values in _SENSITIVITY_RANGES.items():
         rates = [final_adoption_rate(respondents_df, dcm_result, seed=42, **{param: v}) for v in values]

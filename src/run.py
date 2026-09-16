@@ -1,4 +1,7 @@
+import hashlib
 from pathlib import Path
+
+import pandas as pd
 
 from src.preprocess import load_and_clean, check_class_balance
 from src.rac import load_eligibility_rule, apply_eligibility
@@ -9,6 +12,10 @@ from src.outputs import (
     write_scenario_manifest, cohort_breakdown, write_tornado_chart,
     write_deferral_statement, bundle_causal_dag,
 )
+
+
+def _dataset_content_hash(csv_path: str) -> str:
+    return hashlib.sha256(Path(csv_path).read_bytes()).hexdigest()[:12]
 
 
 def run_pipeline(raw_csv_path: str, dag_path: str, output_dir: str, seed: int = 42) -> None:
@@ -38,14 +45,15 @@ def run_pipeline(raw_csv_path: str, dag_path: str, output_dir: str, seed: int = 
 
     model = DiffusionModel(df, dcm_result, seed=seed, **abm_params)
     run_df = model.run()
-    sample = df.sample(n=abm_params["n_agents"], replace=True, random_state=seed).reset_index(drop=True)
+    # model.sample is the exact bootstrap draw the ABM predicted against (same
+    # random_state=seed) — read it back instead of re-deriving a second draw that
+    # would otherwise have to be kept in lockstep with DiffusionModel's own sampling.
     # run_df already carries its own per-agent `eligible` (post fc_uplift); drop the
     # respondents-side copy before joining so the two frames don't collide on that column.
-    breakdown = cohort_breakdown(run_df, sample.drop(columns=["eligible"]))
+    breakdown = cohort_breakdown(run_df, model.sample.drop(columns=["eligible"]))
     breakdown.to_csv(Path(output_dir) / "cohort_breakdown.csv", index=False)
 
     dist = uncertainty_distribution(df, dcm_result, n_seeds=30)
-    import pandas as pd
     pd.DataFrame({"adoption_rate": dist}).to_csv(
         Path(output_dir) / "uncertainty_distribution.csv", index=False
     )
@@ -55,7 +63,7 @@ def run_pipeline(raw_csv_path: str, dag_path: str, output_dir: str, seed: int = 
 
     write_scenario_manifest(
         params=abm_params, seed=seed,
-        dataset_version="pyyjfthc84 (Mendeley, accessed 2026-09)",
+        dataset_version=f"pyyjfthc84 (Mendeley, accessed 2026-09); sha256:{_dataset_content_hash(raw_csv_path)}",
         output_dir=output_dir,
     )
     write_deferral_statement(output_dir)

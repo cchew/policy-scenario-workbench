@@ -39,4 +39,5 @@ class Register:
     def assert_covers(self, param_ids: set) -> None:
         present = {r.parameter for r in self.rows}
         missing = param_ids - present
-        assert not missing, f"Register missing required parameters: {sorted(missing)}"
+        if missing:
+            raise ValueError(f"Register missing required parameters: {sorted(missing)}")

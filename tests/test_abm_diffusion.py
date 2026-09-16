@@ -88,11 +88,13 @@ def test_uncertainty_distribution_length_matches_n_seeds():
     assert len(dist) == 5
 
 
-def test_one_at_a_time_sensitivity_covers_all_five_params():
+def test_one_at_a_time_sensitivity_covers_all_six_params():
     df = _respondents_df()
     result = fit_dcm(df)
     tornado = one_at_a_time_sensitivity(df, result)
-    assert set(tornado.keys()) == {"k", "rewiring_p", "fc_uplift", "peer_influence_weight", "timesteps"}
+    assert set(tornado.keys()) == {
+        "k", "rewiring_p", "fc_uplift", "peer_influence_weight", "timesteps", "n_agents",
+    }
     for lo, hi in tornado.values():
         assert lo <= hi
 

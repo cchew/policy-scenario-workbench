@@ -18,7 +18,7 @@ def test_register_add_and_to_dataframe():
 def test_assert_covers_raises_on_missing_ids():
     reg = Register()
     reg.add(RegisterRow("dcm.coef.pe", 0.42, "survey fit", "observed", ""))
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         reg.assert_covers({"dcm.coef.pe", "dcm.coef.ee"})
 
 
