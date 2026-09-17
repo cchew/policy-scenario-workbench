@@ -1,4 +1,4 @@
-# Policy Scenario Workbench (repo)
+# Policy Scenario Workbench
 
 ## Setup
 
