@@ -1,5 +1,7 @@
 # Policy Scenario Workbench
 
+_Blog post: [Simulating Policy Adoption with Rules-as-Code, DCM and ABM](https://www.herdmentality.xyz/blog/policy-scenario-workbench)_
+
 ## Setup
 
 ```bash
